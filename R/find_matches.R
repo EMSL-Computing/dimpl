@@ -15,29 +15,31 @@
 #' @importFrom dplyr %>%
 #' @export
 find_matches <- function(db, prot_reg, metab_reg) {
-  require(dplyr)
-  require(tibble)
+
   # get the portions of the database corresponding to proteins positively or negatively regulated
   prot_reg <- prot_reg[prot_reg != 0]
   db <- db %>% 
-    dplyr::filter(modifiers %in% names(prot_reg))
-  db <- db %>% mutate(prot_reg = prot_reg[modifiers])
-  #prot_reg <- prot_reg[db$modifiers]
+    dplyr::filter(protein %in% names(prot_reg))
+  db <- db %>% 
+    dplyr::left_join(data.frame(protein=names(prot_reg), protein_regulation=prot_reg))
 
   metab_reg <- metab_reg[metab_reg != 0]
   
-  db <- tibble::column_to_rownames(db, "modifiers")
-  
+  intersect.null <- function(x,y) {
+    result <- intersect(x,y)
+    if (length(result) == 0) result <- NULL
+    return(result)
+  }
   fn <- function(consumed, produced, prot_reg, metab_reg) {
-    nondir  <- as.character(intersect(consumed, produced))
+    nondir  <- as.character(intersect.null(consumed, produced))
     consumed <- setdiff(as.character(consumed), nondir)
     produced <- setdiff(as.character(produced), nondir)
     
     metab_reg <- metab_reg * prot_reg
-    cons <- intersect(consumed, names(metab_reg[metab_reg < 0]))
-    prod <- intersect(produced, names(metab_reg[metab_reg > 0]))
-    ndd <- intersect(nondir, names(metab_reg[metab_reg < 0]))
-    ndu <- intersect(nondir, names(metab_reg[metab_reg > 0]))
+    cons <- intersect.null(consumed, names(metab_reg[metab_reg < 0]))
+    prod <- intersect.null(produced, names(metab_reg[metab_reg > 0]))
+    ndd <- intersect.null(nondir, names(metab_reg[metab_reg < 0]))
+    ndu <- intersect.null(nondir, names(metab_reg[metab_reg > 0]))
     
     if (length(c(cons, prod, ndd, ndu)) > 0) {
       return(list(consumed=cons, produced=prod, nondir_down=ndd, nondir_up=ndu))
@@ -47,8 +49,11 @@ find_matches <- function(db, prot_reg, metab_reg) {
     
   }
   
-  result <- lapply(rownames(db), function(i) fn(db[i, "consumed"][[1]], db[i, "produced"][[1]], 
-                                                db[i, "prot_reg"][[1]], metab_reg))
-  names(result) <- rownames(db)
+  matches <- lapply(1:nrow(db), function(i) fn(db[i, "consumed"][[1]], db[i, "produced"][[1]], 
+                                                db[i, "protein_regulation"][[1]], metab_reg))
+  result <- db %>% dplyr::ungroup()
+  result$matches <- matches
+  result <- result %>% dplyr::filter(unlist(purrr::map(matches, length)) > 0)
+
   return(result)
 }

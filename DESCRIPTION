@@ -15,5 +15,5 @@ Depends:
     R (>= 3.6.3)
 Imports:
   dplyr,
-  tibble
+  purrr
 RoxygenNote: 7.1.0
