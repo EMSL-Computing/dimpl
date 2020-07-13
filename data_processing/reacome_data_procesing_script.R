@@ -14,10 +14,10 @@
 ## PARAMETERS
 
 # Root of dimpl package directory
-dimpl_pkg_dir <- "~/OldFiles/iPMART/R/dimpl"
+dimpl_pkg_dir <- "D:/Files/iPMART/R/dimpl"
 
 # Directory of Reactome SBML files
-data_dir <- "../../Data/all_species.3.1.sbml/"
+data_dir <- "D:/Files/iPMART/Data/all_species.3.1.sbml"
 
 # Reactome data version (from downloaded data filename)
 reactome_data_version <- "3.1"
@@ -31,7 +31,7 @@ num_cores <- 10
 ## END PARAMETERS
 
 wd <- getwd()
-setwd(dipml_pkg_dir)
+setwd(dimpl_pkg_dir)
 
 library(xml2)
 library(dplyr)
@@ -113,7 +113,7 @@ get_reaction_data <- function(root_node) {
 
 # Get the ID used for querying for reaction diagram (root_node is reaction node)
 get_reaction_query_id <- function(root_node) {
-  nodes <- xml_find_all(rxns[[1]], ".//annotation/rdf:RDF/rdf:Description/bqbiol:is/rdf:Bag/rdf:li")
+  nodes <- xml_find_all(root_node, ".//annotation/rdf:RDF/rdf:Description/bqbiol:is/rdf:Bag/rdf:li")
   ids <- xml_attr(nodes, "resource")
   ind <- grepl("https://reactome.org/content/detail", ids)
   ids <- unique(gsub("https://reactome.org/content/detail/", "", ids[ind]))
@@ -269,19 +269,19 @@ parse_file <- function(fname) {
 
 
 # Parse files in parallel:
+print(paste("Starting file parsing:", Sys.time()))
 all_reactions <- foreach(i = 1:length(fnames)) %dopar% parse_file(fnames[i])
+print(paste("Finished file parsing:", Sys.time()))
 
 if (save_intermediate_data) 
-  saveRDS(all_reactions, file=file.path(output_dir, "reactome_data_intermediate1.RDS"))
+  saveRDS(all_reactions, file=file.path(data_dir, "reactome_data_intermediate1.RDS"))
 
 # Join all results together
 all_reactions2 <- do.call(rbind, all_reactions)
 if (save_intermediate_data) saveRDS(all_reactions2, file=file.path(data_dir, "reactome_data_intermediate.RDS"))
 
 
-# 
-
-
+# Reorganize data to collect proteins ("modifiers") across all reactions
 .data <- tidyr::unnest(all_reactions2, modifiers) 
 .data <- .data %>%  group_by(modifiers)
 .data <- .data %>% 
